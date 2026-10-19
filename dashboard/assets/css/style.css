@@ -1,0 +1,154 @@
+/*
+ * AI Traffic Command Center - Custom Styles & Cyber Dark Theme
+ */
+
+
+:root {
+  --bg-main: #060911;
+  --bg-card: rgba(15, 23, 42, 0.75);
+  --border-cyan: rgba(6, 182, 212, 0.3);
+  --glow-cyan: rgba(6, 182, 212, 0.25);
+}
+
+body {
+  background-color: var(--bg-main);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #e2e8f0;
+  overflow-x: hidden;
+}
+
+code, .font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Glassmorphism Cards */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-panel-glow {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-cyan);
+  box-shadow: 0 0 20px var(--glow-cyan), inset 0 0 12px rgba(6, 182, 212, 0.05);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.8);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.6);
+}
+
+/* Radar Sweep Animation */
+@keyframes radar-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Pulsing Neon Glows */
+.glow-cyan-text {
+  text-shadow: 0 0 8px rgba(6, 182, 212, 0.6), 0 0 20px rgba(6, 182, 212, 0.3);
+}
+
+.glow-emerald-text {
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.6), 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+.glow-red-text {
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.6), 0 0 20px rgba(239, 68, 68, 0.3);
+}
+
+/* Animation Utilities */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Toggle Switch Custom Styling */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #334155;
+  transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+input:checked + .slider {
+  background-color: #06b6d4;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.5);
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+.local-panel { padding: 14px 22px; background:#0c1322; border-bottom:1px solid #334155; font-size:12px; line-height:1.8; }
+.local-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.local-panel strong { color:#67e8f9; font-size:15px; }
+.local-panel summary { cursor:pointer; color:#cbd5e1; margin-top:8px; }
+.local-panel p { color:#94a3b8; }
+.local-panel input,.local-panel select,.local-panel button { background:#152138; border:1px solid #475569; border-radius:6px; padding:4px 8px; color:#e2e8f0; }
+.local-panel input { width:130px; } .local-panel button { cursor:pointer; }
+.sim-badge { border:1px solid #155e75; color:#67e8f9; padding:1px 8px; border-radius:5px; font-size:10px; letter-spacing:.1em; }
+#renderStats { font-variant-numeric:tabular-nums; color:#94a3b8; }
+main > section { min-width:0; }
+main > section:nth-child(2) > div:first-child { flex-wrap:wrap; gap:8px; }
+#activeNodeDesc { max-width:100%; white-space:normal; }
+#aiStatusBadge { font-size:10px; }
+/* Keep global controls and node badges inside narrow viewports. */
+header > div:last-child { flex-wrap:wrap; min-width:0; }
+main > section:nth-child(2) > div:first-child > div { min-width:0; flex-wrap:wrap; }
+fieldset:disabled { opacity:.45; }
+@media (max-width:600px) { .local-panel { padding:12px; } #mlDecision,#mlRates { overflow-wrap:anywhere; } }

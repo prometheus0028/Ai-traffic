@@ -1,6 +1,6 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
-from protocol import parse_line, is_allowed_command
+from backend.protocol import parse_line, is_allowed_command
 
 TEL_LINE = (
     '{"type":"tel","ms":5123,"g":"A","next":"-","ph":"GREEN","pt":1100,'
