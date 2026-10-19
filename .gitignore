@@ -7,3 +7,6 @@ data/*.db-shm
 frontend/node_modules/
 frontend/dist/
 .pytest_cache/
+
+node_modules/
+release/

@@ -4,7 +4,7 @@ import threading
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
-from serial_link import SerialLink, find_port, ALLOWED_VIDS
+from backend.serial_link import SerialLink, find_port, ALLOWED_VIDS
 
 TEL_LINE = (
     '{"type":"tel","ms":1,"g":"A","ph":"GREEN","pt":1,"mode":"AUTO","why":"BOOT","emg":"-",'
@@ -25,13 +25,13 @@ class WrongVidPort:
 
 
 def test_find_port_accepts_known_vids(monkeypatch):
-    import serial_link
+    import backend.serial_link as serial_link
     monkeypatch.setattr(serial_link.list_ports, "comports", lambda: [WrongVidPort(), FakePort()])
     assert find_port() == "COM9"
 
 
 def test_find_port_returns_none_when_nothing_matches(monkeypatch):
-    import serial_link
+    import backend.serial_link as serial_link
     monkeypatch.setattr(serial_link.list_ports, "comports", lambda: [WrongVidPort()])
     assert find_port() is None
 
@@ -154,7 +154,7 @@ def test_send_command_led_matches_firmwares_bare_l_ack():
 
 
 def test_find_port_accepts_common_clone_usb_chips(monkeypatch):
-    import serial_link
+    import backend.serial_link as serial_link
 
     class Port:
         def __init__(self, vid, device):

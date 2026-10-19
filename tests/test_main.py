@@ -5,8 +5,8 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 from fastapi.testclient import TestClient
 
-from store import Store
-from main import create_app
+from backend.store import Store
+from backend.main import create_app
 
 
 class FakeLink:

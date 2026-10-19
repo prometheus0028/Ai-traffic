@@ -5,8 +5,8 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
-from store import Store
-from stats import compute_stats
+from backend.store import Store
+from backend.stats import compute_stats
 
 
 def make_store():

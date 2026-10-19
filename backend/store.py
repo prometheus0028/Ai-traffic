@@ -60,6 +60,7 @@ class Store:
         self._last_flush = time.monotonic()
 
     def start_session(self, port: str | None, boot_json: str) -> int:
+        self.flush()
         now = time.time()
         with self._lock:
             cur = self.conn.execute(
@@ -68,7 +69,7 @@ class Store:
             )
             self.conn.commit()
             self.session_id = cur.lastrowid
-        self.ring.clear()
+            self.ring.clear()
         return self.session_id
 
     def end_session(self) -> None:
@@ -102,12 +103,14 @@ class Store:
     def add_event(self, evt: dict) -> None:
         now = time.time()
         row = (self.session_id, now, evt.get("ms"), evt.get("ev"), json.dumps(evt))
-        self._pending_evt.append(row)
+        with self._lock:
+            self._pending_evt.append(row)
         self._maybe_flush(force=True)
 
     def add_command(self, cmd: str, result: str) -> None:
         row = (self.session_id, time.time(), cmd, result)
-        self._pending_cmd.append(row)
+        with self._lock:
+            self._pending_cmd.append(row)
         self._maybe_flush(force=True)
 
     def _maybe_flush(self, force: bool = False) -> None:

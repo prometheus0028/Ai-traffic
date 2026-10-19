@@ -4,25 +4,43 @@ import json
 import os
 import threading
 import time
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from protocol import is_allowed_command
-from serial_link import SerialLink
-from stats import compute_stats
-from store import Store
-from traffic_sim import TrafficSim
+from .protocol import is_allowed_command
+from .serial_link import SerialLink
+from .stats import compute_stats
+from .store import Store
+from .traffic_sim import TrafficSim
 
 REMOTE_PAGE = Path(__file__).resolve().parent / "remote.html"
 
 
-def create_app(link, store: Store, sim: TrafficSim | None = None) -> FastAPI:
-    app = FastAPI()
+def create_app(link, store: Store, sim: TrafficSim | None = None, frontend_dir=None) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app):
+        state['loop'] = asyncio.get_running_loop()
+        if hasattr(link, 'start'):
+            link.start()
+        task = asyncio.create_task(_link_status_loop(status_payload, broadcast))
+        yield
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+        if hasattr(link, 'stop'):
+            await asyncio.to_thread(link.stop)
+        state['loop'] = None
+        store.end_session()
+        store.flush()
+        store.conn.close()
+
+    app = FastAPI(title='CivixFlow + TrafficMind hardware', lifespan=lifespan)
     ws_clients: set[WebSocket] = set()
-    state = {"latest_tel": None, "latest_cfg": None, "loop": None}
+    state = {"latest_tel": None, "latest_cfg": None, "loop": None, 'tel_at': None}
     sim = sim or TrafficSim()
 
     def status_payload() -> dict:
@@ -36,6 +54,7 @@ def create_app(link, store: Store, sim: TrafficSim | None = None) -> FastAPI:
             "last_packet_age": age,
             "parse_errors": link.parse_errors,
             "booted": link.boot_at is not None,
+            'telemetry_age': None if state['tel_at'] is None else max(0, time.time() - state['tel_at']),
         }
 
     def broadcast(kind: str, data: dict) -> None:
@@ -56,6 +75,7 @@ def create_app(link, store: Store, sim: TrafficSim | None = None) -> FastAPI:
                 for ev in sim_events:
                     on_event(ev)
             state["latest_tel"] = obj
+            state['tel_at'] = time.time()
             store.add_telemetry(obj)
             broadcast("tel", obj)
         elif obj["type"] == "evt":
@@ -87,13 +107,6 @@ def create_app(link, store: Store, sim: TrafficSim | None = None) -> FastAPI:
     if hasattr(link, "_on_message"):
         link._on_message = on_message
 
-    @app.on_event("startup")
-    async def startup() -> None:
-        state["loop"] = asyncio.get_event_loop()
-        if hasattr(link, "start"):
-            link.start()
-        asyncio.create_task(_link_status_loop(status_payload, broadcast))
-
     @app.get("/api/status")
     def api_status():
         return {
@@ -115,13 +128,20 @@ def create_app(link, store: Store, sim: TrafficSim | None = None) -> FastAPI:
         if store.session_id is None:
             return JSONResponse({"error": "no_session"}, status_code=404)
         store.flush()
-        return compute_stats(store.conn, store.session_id)
+        with store._lock:
+            return compute_stats(store.conn, store.session_id)
 
     @app.post("/api/command")
     async def api_command(request: Request):
-        body = await request.json()
-        cmd = body.get("cmd", "")
-        if not is_allowed_command(cmd):
+        origin = request.headers.get('origin')
+        if origin and origin not in (f'http://{request.headers.get("host")}', f'https://{request.headers.get("host")}'):
+            return JSONResponse({'ok':False,'error':'foreign_origin'}, status_code=403)
+        try:
+            body = await request.json()
+        except ValueError:
+            return JSONResponse({'ok':False,'error':'invalid_json'}, status_code=400)
+        cmd = body.get("cmd", "") if isinstance(body, dict) else None
+        if not isinstance(cmd, str) or not is_allowed_command(cmd):
             return JSONResponse({"ok": False, "error": "not_allowed"}, status_code=400)
         result = await asyncio.to_thread(link.send_command, cmd)
         store.add_command(cmd, json.dumps(result))
@@ -133,15 +153,24 @@ def create_app(link, store: Store, sim: TrafficSim | None = None) -> FastAPI:
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket):
+        origin = ws.headers.get('origin')
+        if origin and origin not in (f'http://{ws.headers.get("host")}', f'https://{ws.headers.get("host")}'):
+            await ws.close(code=1008)
+            return
         await ws.accept()
         ws_clients.add(ws)
         try:
+            await ws.send_json({'kind':'link','data':status_payload()})
+            if state['latest_cfg']:
+                await ws.send_json({'kind':'evt','data':state['latest_cfg']})
+            if state['latest_tel'] and status_payload()['telemetry_age'] < 1.5:
+                await ws.send_json({'kind':'tel','data':state['latest_tel']})
             while True:
                 await ws.receive_text()
         except WebSocketDisconnect:
             ws_clients.discard(ws)
 
-    frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    frontend_dist = Path(frontend_dir) if frontend_dir else Path(__file__).resolve().parent.parent / 'dashboard'
     if frontend_dist.exists():
         app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
 
@@ -165,7 +194,8 @@ async def _link_status_loop(status_payload, broadcast) -> None:
         await asyncio.sleep(1)
 
 
-DB_PATH = os.environ.get("TRAFFIC_DB", "data/trafficmind.db")
-_store = Store(DB_PATH)
-_link = SerialLink(lambda obj: None, port=os.environ.get("TRAFFIC_PORT"))
-app = create_app(_link, _store)
+def build_app():
+    root = Path(__file__).resolve().parent.parent
+    store = Store(os.environ.get('TRAFFIC_DB', str(root / 'data' / 'trafficmind.db')))
+    link = SerialLink(lambda obj: None, port=os.environ.get('TRAFFIC_PORT'))
+    return create_app(link, store)

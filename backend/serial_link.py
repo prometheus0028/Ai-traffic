@@ -6,7 +6,7 @@ from typing import Callable, Optional
 import serial
 from serial.tools import list_ports
 
-from protocol import parse_line
+from .protocol import parse_line
 
 # USB vendor IDs of Uno boards and the USB-serial chips clones use:
 # Arduino LLC, Arduino SRL, WCH CH340, Silicon Labs CP210x, FTDI.
@@ -47,6 +47,13 @@ class SerialLink:
 
     def stop(self) -> None:
         self._stop.set()
+        if self._ser:
+            try:
+                self._ser.close()
+            except (serial.SerialException, OSError):
+                pass
+        if self._thread.is_alive():
+            self._thread.join(timeout=3)
 
     def _mark_disconnected(self) -> None:
         self.connected = False
@@ -57,7 +64,7 @@ class SerialLink:
             port = self._port_override or find_port()
             if not port:
                 self._mark_disconnected()
-                time.sleep(RECONNECT_DELAY_S)
+                self._stop.wait(RECONNECT_DELAY_S)
                 continue
             try:
                 self._ser = serial.Serial(port, self._baud, timeout=1)
@@ -67,7 +74,7 @@ class SerialLink:
                 self._read_loop()
             except (serial.SerialException, OSError):
                 self._mark_disconnected()
-                time.sleep(RECONNECT_DELAY_S)
+                self._stop.wait(RECONNECT_DELAY_S)
 
     def _read_loop(self) -> None:
         buf = b""
@@ -83,6 +90,9 @@ class SerialLink:
                 buf = b""
             else:
                 buf += chunk
+                if len(buf) > 65536:
+                    self.parse_errors += 1
+                    buf = b''
         self._mark_disconnected()
         try:
             self._ser.close()

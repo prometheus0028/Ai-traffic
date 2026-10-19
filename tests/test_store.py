@@ -4,7 +4,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
-from store import Store
+from backend.store import Store
 
 TEL = {
     "type": "tel", "ms": 5123, "g": "A", "ph": "GREEN", "pt": 1100,

@@ -3,7 +3,7 @@ import random
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
-from traffic_sim import TrafficSim
+from backend.traffic_sim import TrafficSim
 
 
 def dev(ms, la, lb, emg="-", emg_left=0):
