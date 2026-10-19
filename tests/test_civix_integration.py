@@ -45,6 +45,8 @@ def test_primary_frontend_remote_and_private_files(tmp_path):
         page = client.get('/')
         assert page.status_code == 200
         assert 'CivixFlow' in page.text and 'signalSource' in page.text
+        assert page.headers['cache-control'] == 'no-store'
+        assert client.get('/api/app').json()['dashboard'] == 'civixflow'
         assert client.get('/assets/vendor/chart.umd.js').status_code == 200
         assert client.get('/remote').status_code == 200
         assert client.get('/backend/main.py').status_code == 404

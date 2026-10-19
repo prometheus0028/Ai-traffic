@@ -107,6 +107,17 @@ def create_app(link, store: Store, sim: TrafficSim | None = None, frontend_dir=N
     if hasattr(link, "_on_message"):
         link._on_message = on_message
 
+    @app.middleware('http')
+    async def refresh_dashboard(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path in ('/', '/index.html', '/api/app') or request.url.path.startswith(('/js/', '/assets/')):
+            response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    @app.get('/api/app')
+    def app_identity():
+        return {'dashboard': 'civixflow', 'pid': os.getpid()}
+
     @app.get("/api/status")
     def api_status():
         return {

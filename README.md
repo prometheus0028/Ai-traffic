@@ -20,6 +20,8 @@ Port 8000 is the web server port; `--serial-port COM5` is the USB device. The up
 
 Without an Arduino, the primary frontend still runs its smooth local adaptive simulation. Hardware status says disconnected and physical controls remain disabled. This is the expected state when no board is plugged in.
 
+If you see the old interface, stop the old terminal with Ctrl+C and run the updated checkout again. Startup prints the project folder and the `dashboard/` directory being served. It now reserves the HTTP port before opening the browser and verifies that this process is serving CivixFlow. If the port is occupied, it reports an error instead of opening an older listener. Try `python run.py --port 8001`, open `http://127.0.0.1:8001/` and force-refresh with Ctrl+Shift+R. The `/remote` URL deliberately retains the separate LED-control page; the cars dashboard is at `/`. `/api/app` identifies the running app as `civixflow`.
+
 ## Arduino + phone hotspot
 
 The actual connection is:
