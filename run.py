@@ -24,8 +24,19 @@ def ensure_frontend_built() -> None:
     subprocess.run(["npm", "run", "build"], cwd=str(ROOT / "frontend"), check=True, shell=(os.name == "nt"))
 
 
-def open_browser_later(url: str) -> None:
-    threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+def open_browser_later(url: str, host: str = "127.0.0.1", port: int = 8000) -> None:
+    """Opens the browser once the server actually accepts connections, instead of
+    guessing a fixed delay (the frontend build alone can take 10+ seconds)."""
+    def wait_then_open() -> None:
+        for _ in range(100):  # up to 20s
+            try:
+                with socket.create_connection((host, port), timeout=0.2):
+                    break
+            except OSError:
+                threading.Event().wait(0.2)
+        webbrowser.open(url)
+
+    threading.Thread(target=wait_then_open, daemon=True).start()
 
 
 def lan_addresses() -> list[str]:
