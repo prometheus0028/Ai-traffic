@@ -64,78 +64,26 @@ pipeline {
             }
         }
 
+
         stage('Start isolated test application') {
             steps {
-                powershell '''
-                    $ErrorActionPreference = "Stop"
-
-                    New-Item -ItemType Directory -Force reports | Out-Null
-                    New-Item -ItemType Directory -Force data | Out-Null
-
-                    # Check whether port 8000 is already occupied.
-                    $tcp = New-Object System.Net.Sockets.TcpClient
-                    try {
-                        $tcp.Connect("127.0.0.1", 8000)
-                        $tcp.Close()
-                        throw "Port 8000 is already in use. Stop the conflicting application before running tests."
-                    } catch [System.Net.Sockets.SocketException] {
-                        Write-Output "Port 8000 is free."
-                    } finally {
-                        $tcp.Dispose()
-                    }
-
-                    # Use a separate database for Jenkins testing.
-                    foreach ($f in @(
-                        "data\\jenkins-testing.db",
-                        "data\\jenkins-testing.db-wal",
-                        "data\\jenkins-testing.db-shm"
-                    )) {
-                        if (Test-Path $f) {
-                            Remove-Item $f -Force
-                        }
-                    }
-
-                    $env:TRAFFIC_DB = Join-Path $env:WORKSPACE "data\\jenkins-testing.db"
-
-                    $python = Join-Path $env:WORKSPACE ".venv\\Scripts\\python.exe"
-                    $out = Join-Path $env:WORKSPACE "reports\\server.log"
-                    $err = Join-Path $env:WORKSPACE "reports\\server.err.log"
-                    $pidFile = Join-Path $env:WORKSPACE "reports\\server.pid"
-
-                    # Start the application in a detached Windows process.
-                    $pythonArgs = "`"$python`" run.py --host 127.0.0.1 --port 8000 --no-browser"
-
-                    $proc = Start-Process `
-                        -FilePath "$env:ComSpec" `
-                        -ArgumentList @("/c", "start", '""', "/b", $pythonArgs) `
-                        -WorkingDirectory $env:WORKSPACE `
-                        -RedirectStandardOutput $out `
-                        -RedirectStandardError $err `
-                        -PassThru `
-                        -WindowStyle Hidden
-
-                    # Do not treat the short-lived launcher PID as the server PID.
-                    Start-Sleep -Seconds 2
-
-                    $listener = Get-NetTCPConnection `
-                        -LocalAddress 127.0.0.1 `
-                        -LocalPort 8000 `
-                        -State Listen `
-                        -ErrorAction SilentlyContinue |
-                        Select-Object -First 1
-
-                    if (-not $listener) {
-                        Write-Output "Application did not open port 8000. Server logs:"
-                        Get-Content $out -ErrorAction SilentlyContinue
-                        Get-Content $err -ErrorAction SilentlyContinue
-                        throw "Application failed to start listening on port 8000."
-                    }
-
-                    Set-Content -Path $pidFile -Value $listener.OwningProcess
-                    Write-Output "Application is listening on port 8000 (PID $($listener.OwningProcess))."
+                bat '''
+                    @echo on
+                    if not exist reports mkdir reports
+                    if not exist data mkdir data
+                    if exist reports\\server.pid del /q reports\\server.pid
+                    if exist reports\\server.log del /q reports\\server.log
+                    if exist reports\\server.err.log del /q reports\\server.err.log
+                    if exist data\\jenkins-testing.db del /q data\\jenkins-testing.db
+                    if exist data\\jenkins-testing.db-shm del /q data\\jenkins-testing.db-shm
+                    if exist data\\jenkins-testing.db-wal del /q data\\jenkins-testing.db-wal
+                    set TRAFFIC_DB=%WORKSPACE%\\data\\jenkins-testing.db
+                    .venv\\Scripts\\python.exe -u testing\\start_server.py
+                    if errorlevel 1 exit /b 1
                 '''
             }
         }
+
 
         
         stage('Wait until app ready') {
