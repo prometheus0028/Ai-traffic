@@ -34,29 +34,59 @@ pipeline {
                 bat '.venv\\Scripts\\python.exe -m pytest tests -q --ignore=tests\\functional --ignore=tests\\performance --junitxml=reports\\backend-regression-results.xml'
             }
         }
+        
         stage('Start isolated test application') {
             steps {
                 powershell '''
                     $ErrorActionPreference = "Stop"
-                    if (-not (Test-Path "reports")) { New-Item -ItemType Directory -Force reports | Out-Null }
-                    if (-not (Test-Path "data")) { New-Item -ItemType Directory -Force data | Out-Null }
+
+                    New-Item -ItemType Directory -Force reports | Out-Null
+                    New-Item -ItemType Directory -Force data | Out-Null
+
                     $tcp = New-Object System.Net.Sockets.TcpClient
                     try {
                         $tcp.Connect("127.0.0.1", 8000)
                         $tcp.Close()
-                        throw "Port 8000 is already in use. Stop any manually started app before building."
-                    } catch [System.Net.Sockets.SocketException] { Write-Output "Port 8000 is free." }
-                    foreach ($f in @("data\\jenkins-testing.db", "data\\jenkins-testing.db-wal", "data\\jenkins-testing.db-shm")) { if (Test-Path $f) { Remove-Item $f -Force } }
+                        throw "Port 8000 is already in use."
+                    } catch [System.Net.Sockets.SocketException] {
+                        Write-Output "Port 8000 is free."
+                    }
+
+                    foreach ($f in @(
+                        "data\\jenkins-testing.db",
+                        "data\\jenkins-testing.db-wal",
+                        "data\\jenkins-testing.db-shm"
+                    )) {
+                        if (Test-Path $f) { Remove-Item $f -Force }
+                    }
+
                     $env:TRAFFIC_DB = Join-Path $env:WORKSPACE "data\\jenkins-testing.db"
                     $python = Join-Path $env:WORKSPACE ".venv\\Scripts\\python.exe"
                     $out = Join-Path $env:WORKSPACE "reports\\server.log"
                     $err = Join-Path $env:WORKSPACE "reports\\server.err.log"
-                    $proc = Start-Process -FilePath $python -ArgumentList @("run.py", "--host", "127.0.0.1", "--port", "8000", "--no-browser") -WorkingDirectory $env:WORKSPACE -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+
+                    $proc = Start-Process `
+                        -FilePath $python `
+                        -ArgumentList @("run.py", "--host", "127.0.0.1", "--port", "8000", "--no-browser") `
+                        -WorkingDirectory $env:WORKSPACE `
+                        -RedirectStandardOutput $out `
+                        -RedirectStandardError $err `
+                        -PassThru
+
                     Set-Content -Path (Join-Path $env:WORKSPACE "reports\\server.pid") -Value $proc.Id
                     Write-Output "Started application process $($proc.Id)."
+
+                    Start-Sleep -Seconds 2
+                    if ($proc.HasExited) {
+                        Get-Content $err -ErrorAction SilentlyContinue
+                        throw "Application exited immediately with code $($proc.ExitCode)."
+                    }
+
+                    Write-Output "Application process is running; continuing to readiness check."
                 '''
             }
         }
+
         stage('Wait until app is ready') {
             steps { bat 'set TRAFFICMIND_URL=http://127.0.0.1:8000&& .venv\\Scripts\\python.exe testing\\wait_for_app.py' }
         }
