@@ -137,11 +137,19 @@ pipeline {
             }
         }
 
-        stage('Wait until app is ready') {
+        
+        stage('Wait until app ready') {
             steps {
-                bat 'set TRAFFICMIND_URL=http://127.0.0.1:8000&& .venv\\Scripts\\python.exe testing\\wait_for_app.py'
+                timeout(time: 75, unit: 'SECONDS') {
+                    bat '''
+                        @echo on
+                        set TRAFFICMIND_URL=http://127.0.0.1:8000
+                        .venv\\Scripts\\python.exe -u testing\\wait_for_app.py
+                    '''
+                }
             }
         }
+
 
         stage('Functional tests - Selenium') {
             steps {
